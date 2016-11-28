@@ -10,32 +10,23 @@ def barrier(X, y, reg_coef, w0_plus, w0_minus, tol=1e-5, tol_inner=1e-7, max_ite
     y_ = X.T.dot(y) / n
     tau = t0
 
-    def matr(A,w_plus,w_minus) :
+    def matr(A,w_plus,w_minus, tau) :
         d = w_plus.size
         res = np.array([A[:,i] * (1 + (w_minus[i] / w_plus[i]) ** 2) for i in range(d)]).T
         for i in range(d) :
-            res[i][i] += (1 / w_plus[i] ** 2)
+            res[i][i] += (1 / (tau * w_plus[i] ** 2))
         return res
 
     def generate_b(w_plus, w_minus, tau):
         b = w_plus - w_minus + 2 * tau *  reg_coef * np.array([w ** 2 for w in w_minus])
         b = b - np.array([w_m ** 2 / w_p for w_m, w_p in zip(w_minus, w_plus)]) - w_minus
-        b = tau * (-A.dot(b) + y_) + np.array([1 / w - reg_coef * tau for w in w_plus])
+        b = -A.dot(b) + y_ + np.array([1 / (tau * w) - reg_coef for w in w_plus])
         return b
 
     def select_alpha(w,p) :
         alpha_list = [-w_ / p_ for w_,p_ in zip(w,p) if p_ < 0]
         alpha = np.inf if not alpha_list else min(alpha_list)
         return alpha
-
-    def func(w_plus, w_minus, tau) :
-        ans = 0.5 * tau / n * la.norm(X.dot(w_plus - w_minus) - y) ** 2 + tau * reg_coef * sum(list(w_plus + w_minus))
-        ans -= sum([np.log(w_p) + np.log(w_m) for w_p,w_m in zip(w_plus, w_minus)])
-        return ans
-
-    def armiho(w_plus, w_minus, p_plus, p_minus, f, dot, alpha, tau) :
-        return func(w_plus + alpha * p_plus, w_minus + alpha * p_minus,tau) - c1 * alpha * dot - f < 0
-
 
     w_plus = w0_plus
     w_minus = w0_minus
@@ -45,35 +36,43 @@ def barrier(X, y, reg_coef, w0_plus, w0_minus, tol=1e-5, tol_inner=1e-7, max_ite
 
     while True :
 
-        grad_plus = tau * A.dot(w_plus - w_minus) - tau * y_
-        grad_plus = grad_plus + np.array([tau * reg_coef - 1 / w for w in w_plus])
-        grad_minus = -tau * A.dot(w_plus - w_minus) + tau * y_
-        grad_minus = grad_minus + np.array([tau * reg_coef - 1 / w for w in w_minus])
+        grad_plus = A.dot(w_plus - w_minus) - y_
+        grad_plus = grad_plus + np.array([reg_coef - 1 / (tau * w) for w in w_plus])
+        grad_minus = -A.dot(w_plus - w_minus) + y_
+        grad_minus = grad_minus + np.array([reg_coef - 1 / (tau * w) for w in w_minus])
         norm_g = la.norm(np.array(list(grad_plus) + list(grad_minus)))
         n_iter_inner = 0
 
-        while norm_g > tol_inner and n_iter_inner < max_iter_inner :
+        while norm_g > tol_inner / tau and n_iter_inner < max_iter_inner :
 
             b = generate_b(w_plus, w_minus, tau)
-            p_plus = la.solve(matr(tau * A,w_plus,w_minus), b)
+            p_plus = la.solve(matr(A,w_plus,w_minus, tau), b)
             p_minus = np.array([w_m ** 2 * (-2 * reg_coef * tau + 1 / w_p) + w_m - (w_m ** 2) / (w_p ** 2) * p for w_m,w_p,p in zip(w_minus, w_plus, p_plus)])
             dot = grad_plus.dot(p_plus) + grad_minus.dot(p_minus)
 
             alpha = select_alpha(list(w_plus) + list(w_minus), list(p_plus) + list(p_minus))
             alpha = min(1, 0.95 * alpha)
 
-            f = func(w_plus, w_minus, tau)
+            scal_1 = A.dot(w_plus - w_minus).dot(p_plus - p_minus) - y_.dot(p_plus - p_minus)
+            scal_2 = 0.5 * (la.norm(X.dot(p_plus - p_minus)) ** 2) / n
+            scal_3 = reg_coef * sum(list(p_plus + p_minus))
+            log_sum = sum([np.log(1 + alpha * p / w) for p,w in zip(p_plus, w_plus)])
+            log_sum += sum([np.log(1 + alpha * p / w) for p,w in zip(p_minus, w_minus)])
+            armiho = alpha * scal_1 + (alpha ** 2) * scal_2 + alpha * scal_3 - log_sum / tau - c1 * alpha * dot < 0
 
-            while not armiho(w_plus, w_minus, p_plus, p_minus, f, dot, alpha, tau) :
+            while not armiho:
                 alpha /= 2
+                log_sum = sum([np.log(1 + alpha * p / w) for p,w in zip(p_plus, w_plus)])
+                log_sum += sum([np.log(1 + alpha * p / w) for p,w in zip(p_minus, w_minus)])
+                armiho = alpha * scal_1 + (alpha ** 2) * scal_2 + alpha * scal_3 - log_sum / tau - c1 * alpha * dot < 0
 
             w_plus = w_plus + alpha * p_plus
             w_minus = w_minus + alpha * p_minus
 
-            grad_plus = tau * A.dot(w_plus - w_minus) - tau * y_
-            grad_plus = grad_plus + np.array([tau * reg_coef - 1 / w for w in w_plus])
-            grad_minus = -tau * A.dot(w_plus - w_minus) + tau * y_
-            grad_minus = grad_minus + np.array([tau * reg_coef - 1 / w for w in w_minus])
+            grad_plus = A.dot(w_plus - w_minus) - y_
+            grad_plus = grad_plus + np.array([reg_coef - 1 / (tau * w) for w in w_plus])
+            grad_minus = -A.dot(w_plus - w_minus) + y_
+            grad_minus = grad_minus + np.array([reg_coef - 1 / (tau * w) for w in w_minus])
             norm_g = la.norm(np.array(list(grad_plus) + list(grad_minus)))
 
             n_iter_inner += 1
@@ -188,7 +187,7 @@ w0 = np.array([1, 1])
 w0_plus = np.array([1, 1])
 w0_minus = np.array([2, 2])
 
-w,s = barrier(X, y, reg_coef, w0_plus, w0_minus, max_iter_inner = 6)
+w,s = barrier(X, y, reg_coef, w0_plus, w0_minus)
 print(w)
 print(s)
 
