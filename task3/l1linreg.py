@@ -41,7 +41,7 @@ def barrier(X, y, reg_coef, w0_plus, w0_minus, tol=1e-5, tol_inner=1e-7, max_ite
     phi_list = list()
     dual_gap_list = list()
 
-    mu = min(1, n * reg_coef / (la.norm(X.dot(w_plus - w_minus) - y, np.inf))) * (X.dot(w_plus - w_minus) - y) / n
+    mu = min(1, reg_coef / (la.norm(A.dot(w_plus - w_minus) - y_, np.inf))) * (X.dot(w_plus - w_minus) - y) / n
     dual_gap = 0.5 / n * la.norm(X.dot(w_plus - w_minus) - y) ** 2 + reg_coef * la.norm(w_plus - w_minus, 1) + n / 2 * la.norm(mu) ** 2 + mu.dot(y)
 
     while True :
@@ -99,7 +99,7 @@ def barrier(X, y, reg_coef, w0_plus, w0_minus, tol=1e-5, tol_inner=1e-7, max_ite
             if disp:
                 print('%s %3d %s %8f %s %5f %s %5f' % ('#_inner:', n_iter_inner,'   norm_g:',norm_g,'   f_min:',f_min,'   elaps_t:',elaps_t))
 
-        mu = min(1, n * reg_coef / (la.norm(X.dot(w_plus - w_minus) - y, np.inf))) * (X.dot(w_plus - w_minus) - y) / n
+        mu = min(1, reg_coef / (la.norm(A.dot(w_plus - w_minus) - y_, np.inf))) * (X.dot(w_plus - w_minus) - y) / n
         dual_gap = 0.5 / n * la.norm(X.dot(w_plus - w_minus) - y) ** 2 + reg_coef * la.norm(w_plus - w_minus, 1) + n / 2 * la.norm(mu) ** 2 + mu.dot(y)
         if disp:
             print('%s %10f' % ('dual_gap', dual_gap))
@@ -117,153 +117,3 @@ def barrier(X, y, reg_coef, w0_plus, w0_minus, tol=1e-5, tol_inner=1e-7, max_ite
         return w_plus - w_minus, status, hist
     else :
         return w_plus - w_minus, status
-
-
-def subgrad(X, y, reg_coef, w0, tol=1e-2, max_iter=1000, alpha=1,disp=False, trace=False) :
-
-    def subg(w) :
-        return np.array([np.random.uniform(-1,1) if w[i] == 0 else np.sign(w[i]) for i in range(w.size)])
-
-    def func(w) :
-        return 0.5 / n * (la.norm(X.dot(w) - y) ** 2) + reg_coef * la.norm(w, 1)
-
-    n = y.size
-    A = 1 / n * X.T.dot(X)
-    y_ = 1 / n * X.T.dot(y)
-
-    w = w0
-    f = func(w)
-    direction_ = A.dot(w) - y_
-
-    mu = min(1 , reg_coef / la.norm(A.dot(w) - y_), np.inf) * (X.dot(w) - y) / n
-    dual_gap = 0.5 / n * la.norm(X.dot(w) - y) ** 2 + reg_coef * la.norm(w, 1) + 0.5 * n * la.norm(mu) ** 2 + mu.dot(y)
-
-    n_iter = 0
-    real_step = 0
-    t_start = time.time()
-    elaps_t_list = list()
-    phi_list = list()
-    dual_gap_list = list()
-
-    while dual_gap > tol and n_iter < max_iter :
-
-        w_pred = w
-        f_pred = f
-
-        direction = reg_coef * subg(w) + direction_
-        direction /= la.norm(direction)
-        w = w - alpha / (real_step + 1) ** 0.5 * direction
-        f = func(w)
-
-        if f_pred > f :
-            mu = min(1 , reg_coef / la.norm(A.dot(w) - y_), np.inf) * (X.dot(w) - y) / n
-            dual_gap = 0.5 / n * la.norm(X.dot(w) - y) ** 2 + reg_coef * la.norm(w, 1) + 0.5 * n * la.norm(mu) ** 2 + mu.dot(y)
-            direction_ = A.dot(w) - y_
-            real_step += 1
-        else :
-            w = w_pred
-            f = f_pred
-
-        n_iter += 1
-        elaps_t = time.time() - t_start
-
-        elaps_t_list.append(elaps_t)
-        phi_list.append(f)
-        dual_gap_list.append(dual_gap)
-
-        if disp:
-            print('%s %3d %s %8f %s %5f %s %5f' % ('#:', n_iter,'   f_min:',f,'   dual_gap:',dual_gap,'   elaps_t:',elaps_t))
-
-    status = 0 if dual_gap < tol else 1
-    if trace :
-        hist = {'elaps_t' : np.array(elaps_t_list), 'phi' : np.array(phi_list), 'dual_gap' : np.array(dual_gap_list)}
-        return w, status, hist
-    else :
-        return w, status
-
-
-
-def prox_grad(X, y, reg_coef, w0, tol=1e-5, max_iter=1000, L0=1, disp=False, trace=False) :
-
-    r = 1 / reg_coef
-
-    def prox(x, alpha) :
-        ans = [x[i] + alpha if x[i] < -alpha else x[i] - alpha if x[i] > alpha else 0 for i in range(x.size)]
-        return np.array(ans)
-
-    def func(w) :
-        return r * 0.5 / n * la.norm(X.dot(w) - y) ** 2 + la.norm(w,1)
-
-    def m_L(y , x, grad, L) :
-         return func(x) + r * grad.dot(y - x) + 0.5 * L * la.norm(y - x) ** 2 + la.norm(y, 1)
-
-    w = w0
-    L = L0
-    n = y.size
-
-    X_ = 1 / n * X.T.dot(X)
-    y_ = 1 / n * X.T.dot(y)
-
-    n_iter = 0
-
-    t_start = time.time()
-    elaps_t_list = list()
-    phi_list = list()
-    dual_gap_list = list()
-    ls_iters_list = list()
-    ls_iters = 0
-
-    while True :
-
-        L = L / 2
-        w_pred = w
-        grad = (X_.dot(w_pred) - y_)
-        w = prox(w_pred - 1 / L * r * grad, 1 / L)
-        f = func(w)
-
-        while f > m_L(w, w_pred, grad, L) :
-            ls_iters += 1
-            L *= 2
-            w = prox(w_pred - 1 / L * r * grad, 1 / L)
-            f = func(w)
-        L = max(L0, L)
-
-        mu = min(1, reg_coef / la.norm(X_.dot(w) - y_, np.inf)) * (X.dot(w)  - y) / n
-        dual_gap = 0.5 / n * la.norm(X.dot(w) - y) ** 2 + reg_coef * la.norm(w, 1) + 0.5 * n * la.norm(mu) ** 2 + mu.dot(y)
-
-
-        n_iter += 1
-        elaps_t = time.time() - t_start
-
-        elaps_t_list.append(elaps_t)
-        phi_list.append(f / r)
-        dual_gap_list.append(dual_gap)
-        ls_iters_list.append(ls_iters)
-
-        if disp:
-            print('%s %3d %s %8f %s %5f %s %5f' % ('#:', n_iter,'   f_min:',f,'   dual_gap:',dual_gap,'   elaps_t:',elaps_t))
-
-        if dual_gap < tol or n_iter == max_iter :
-            break
-
-    status = 0 if dual_gap < tol else 1
-    if trace :
-        hist = {'elaps_t' : np.array(elaps_t_list), 'phi' : np.array(phi_list), 'dual_gap' : np.array(dual_gap_list), 'ls_iters' : np.array(ls_iters_list)}
-        return w, status, hist
-    else :
-        return w, status
-
-X,y = load_svmlight_file("E:\Programms\Py\MOMO\Data\sonar_scale.svmlight")
-X = X.toarray()
-y = np.random.uniform(0, 1, (X.shape[0]))
-#y = np.zeros(X.shape[0])
-w0_plus = 3 * np.ones(60)
-w0_minus = 4 * np.ones(60)
-w0 = 3 * np.ones(60)
-w, s = barrier(X, y, 1 / X.shape[0], w0_plus, w0_minus, tol=1e-9, tol_inner=1e-7, max_iter=100, max_iter_inner=20, t0=6, gamma=10, c1=1e-4, disp=True)
-#print(w)
-#print(s)
-#w,s = subgrad(X, y, 1, w0,disp=True)
-#w,s = subgrad(X, y, 1/208, w, disp=True)
-print(w)
-print(s)
