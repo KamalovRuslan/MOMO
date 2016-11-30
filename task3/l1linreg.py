@@ -117,3 +117,49 @@ def barrier(X, y, reg_coef, w0_plus, w0_minus, tol=1e-5, tol_inner=1e-7, max_ite
         return w_plus - w_minus, status, hist
     else :
         return w_plus - w_minus, status
+
+
+def subgrad(X, y, reg_coef, w0, tol=1e-2, max_iter=1000, alpha=1,disp=False, trace=False) :
+
+    n = X.shape[0]
+
+    def subg(w) :
+        return np.array([np.random.uniform(-1,1) if w_ == 0 else np.sign(w_) for w_ in w])
+    def func(w) :
+        return 0.5 / n * la.norm(X.dot(w) - y) ** 2 + reg_coef * la.norm(w,1)
+
+    t_start = time.time()
+    elaps_t_list = list()
+    phi_list = list()
+    dual_gap_list = list()
+
+    w, f = w0, func(w0)
+    w_min, f_min = w, f
+    A = 1 / n * X.T.dot(X)
+    y_ = 1 / n * X.T.dot(y)
+    mu = min(1, reg_coef / (la.norm(A.dot(w) - y_, np.inf))) * (X.dot(w) - y) / n
+    dual_gap = 0.5 / n * la.norm(X.dot(w) - y) ** 2 + reg_coef * la.norm(w, 1) + n / 2 * la.norm(mu) ** 2 + mu.dot(y)
+    n_iter = 0
+
+    while dual_gap > tol and n_iter < max_iter :
+        direction_ = A.dot(w) - y_
+        w = w - alpha / ((n_iter + 1) ** 0.5) * (direction_ + reg_coef * subg(w))
+        f = func(w)
+        if f_min > f :
+            w_min, f_min = w, f
+            mu = min(1, reg_coef / (la.norm(A.dot(w) - y_, np.inf))) * (X.dot(w) - y) / n
+            dual_gap = 0.5 / n * la.norm(X.dot(w) - y) ** 2 + reg_coef * la.norm(w, 1) + n / 2 * la.norm(mu) ** 2 + mu.dot(y)
+        n_iter += 1
+        elaps_t = time.time() - t_start
+        elaps_t_list.append(elaps_t)
+        phi_list.append(f)
+        dual_gap_list.append(dual_gap)
+
+        if disp:
+            print('%s %3d %s %8f %s %5f %s %5f' % ('#:', n_iter,'   f_min:',f,'   dual_gap:',dual_gap,'   elaps_t:',elaps_t))
+    status = 0 if dual_gap < tol else 1
+    if trace :
+        hist = {'elaps_t' : np.array(elaps_t_list), 'phi' : np.array(phi_list), 'dual_gap' : np.array(dual_gap_list)}
+        return w, status, hist
+    else :
+        return w, status
