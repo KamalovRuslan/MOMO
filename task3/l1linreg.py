@@ -139,7 +139,7 @@ def subgrad(X, y, reg_coef, w0, tol=1e-2, max_iter=1000, alpha=1,disp=False, tra
     A = 1 / n * X.T.dot(X)
     y_ = 1 / n * X.T.dot(y)
     r = X.dot(w) - y
-    mu = min(1, (reg_coef * n) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
+    mu = min(1, (reg_coef) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
     dual_gap = (1 / (2 * n)) * la.norm(r) ** 2 + reg_coef * la.norm(w, 1) + (n / 2) * la.norm(mu) ** 2 + y.dot(mu)
     n_iter = 0
 
@@ -152,7 +152,7 @@ def subgrad(X, y, reg_coef, w0, tol=1e-2, max_iter=1000, alpha=1,disp=False, tra
         if f_min > f :
             w_min, f_min = w, f
             r = X.dot(w) - y
-            mu = min(1, (reg_coef * n) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
+            mu = min(1, (reg_coef) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
             dual_gap = (1 / (2 * n)) * la.norm(r) ** 2 + reg_coef * la.norm(w, 1) + (n / 2) * la.norm(mu) ** 2 + y.dot(mu)
 
         n_iter += 1
@@ -168,9 +168,9 @@ def subgrad(X, y, reg_coef, w0, tol=1e-2, max_iter=1000, alpha=1,disp=False, tra
 
     if trace :
         hist = {'elaps_t' : np.array(elaps_t_list), 'phi' : np.array(phi_list), 'dual_gap' : np.array(dual_gap_list)}
-        return w, status, hist
+        return w_min, status, hist
     else :
-        return w, status
+        return w_min, status
 
 
 def prox_grad(X, y, reg_coef, w0, tol=1e-5, max_iter=1000, L0=1, disp=False, trace=False):
@@ -195,7 +195,7 @@ def prox_grad(X, y, reg_coef, w0, tol=1e-5, max_iter=1000, L0=1, disp=False, tra
 
     ls_iters = 0
     r = X.dot(w) - y
-    mu = min(1, (reg_coef * n) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
+    mu = min(1, (reg_coef) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
     dual_gap = (1 / (2 * n)) * la.norm(r) ** 2 + reg_coef * la.norm(w, 1) + (n / 2) * la.norm(mu) ** 2 + y.dot(mu)
     df_ = A.dot(w) - y_
     f_ = func(w)
@@ -222,7 +222,7 @@ def prox_grad(X, y, reg_coef, w0, tol=1e-5, max_iter=1000, L0=1, disp=False, tra
         df_ = A.dot(w) - y_
 
         r = X.dot(w) - y
-        mu = min(1, (reg_coef * n) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
+        mu = min(1, (reg_coef) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
         dual_gap = (1 / (2 * n)) * la.norm(r) ** 2 + reg_coef * la.norm(w, 1) + (n / 2) * la.norm(mu) ** 2 + y.dot(mu)
         n_iter += 1
         elaps_t = time.time() - t_start
