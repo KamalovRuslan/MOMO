@@ -4,6 +4,7 @@ from numpy import linalg as la
 import time
 from sklearn.datasets import load_svmlight_file
 from sklearn.preprocessing import normalize
+import matplotlib.pyplot as plt
 
 def barrier(X, y, reg_coef, w0_plus, w0_minus, tol=1e-5, tol_inner=1e-7, max_iter=100, max_iter_inner=20, t0=1, gamma=10, c1=1e-4, disp=False, trace=False) :
 
@@ -45,6 +46,7 @@ def barrier(X, y, reg_coef, w0_plus, w0_minus, tol=1e-5, tol_inner=1e-7, max_ite
     mu = min(1, reg_coef / (la.norm(A.dot(w_plus - w_minus) - y_, np.inf))) * (X.dot(w_plus - w_minus) - y) / n
     dual_gap = 0.5 / n * la.norm(X.dot(w_plus - w_minus) - y) ** 2 + reg_coef * la.norm(w_plus - w_minus, 1) + n / 2 * la.norm(mu) ** 2 + mu.dot(y)
 
+
     while True :
 
         grad_plus = A.dot(w_plus - w_minus) - y_
@@ -54,7 +56,7 @@ def barrier(X, y, reg_coef, w0_plus, w0_minus, tol=1e-5, tol_inner=1e-7, max_ite
         norm_g = la.norm(np.array(list(grad_plus) + list(grad_minus)))
         n_iter_inner = 0
         if disp:
-            print('%s %3d' % ('#:', n_iter))
+            print('%s %3d' % ('#:', n_iter + 1))
 
         while norm_g / tol_inner > 1 / tau and n_iter_inner < max_iter_inner :
 
@@ -134,6 +136,7 @@ def subgrad(X, y, reg_coef, w0, tol=1e-2, max_iter=1000, alpha=1,disp=False, tra
     phi_list = list()
     dual_gap_list = list()
 
+
     w, f = w0, func(w0)
     w_min, f_min = w, f
     A = 1 / n * X.T.dot(X)
@@ -142,11 +145,12 @@ def subgrad(X, y, reg_coef, w0, tol=1e-2, max_iter=1000, alpha=1,disp=False, tra
     mu = min(1, (reg_coef) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
     dual_gap = (1 / (2 * n)) * la.norm(r) ** 2 + reg_coef * la.norm(w, 1) + (n / 2) * la.norm(mu) ** 2 + y.dot(mu)
     n_iter = 0
+    real_step = 0
 
     while dual_gap > tol and n_iter < max_iter :
 
         direction_ = A.dot(w) - y_
-        w = w - alpha / ((n_iter + 1) ** 0.5) * (direction_ + reg_coef * subg(w))
+        w = w - alpha / ((real_step + 1) ** 0.5) * (direction_ + reg_coef * subg(w))
         f = func(w)
 
         if f_min > f :
@@ -154,6 +158,7 @@ def subgrad(X, y, reg_coef, w0, tol=1e-2, max_iter=1000, alpha=1,disp=False, tra
             r = X.dot(w) - y
             mu = min(1, (reg_coef) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
             dual_gap = (1 / (2 * n)) * la.norm(r) ** 2 + reg_coef * la.norm(w, 1) + (n / 2) * la.norm(mu) ** 2 + y.dot(mu)
+            real_step += 1
 
         n_iter += 1
         elaps_t = time.time() - t_start
@@ -206,24 +211,25 @@ def prox_grad(X, y, reg_coef, w0, tol=1e-5, max_iter=1000, L0=1, disp=False, tra
     elaps_t_list = list()
     ls_iters_list = list()
 
+
     while dual_gap > tol and n_iter < max_iter :
 
         while True:
             ls_iters += 1
-            w_cur = prox(w - 1.0 / L * df_, 1 / L * reg_coef)
+            w_cur = prox(w - 1 / L * df_, 1 / L * reg_coef)
             f_cur = func(w_cur)
             if f_cur <= f_ + ml(w_cur, w, df_, L):
                 break
             else:
                 L *= 2
-        L = max(L0, L / 2.0)
+        L = max(L0, L / 2)
         w = w_cur
         f_ = func(w)
         df_ = A.dot(w) - y_
 
         r = X.dot(w) - y
         mu = min(1, (reg_coef) / la.norm(A.dot(w) - y_, np.inf)) * (1 / n) * r
-        dual_gap = (1 / (2 * n)) * la.norm(r) ** 2 + reg_coef * la.norm(w, 1) + (n / 2) * la.norm(mu) ** 2 + y.dot(mu)
+        dual_gap = abs((1 / (2 * n)) * la.norm(r) ** 2 + reg_coef * la.norm(w, 1) + (n / 2) * la.norm(mu) ** 2 + y.dot(mu))
         n_iter += 1
         elaps_t = time.time() - t_start
 
