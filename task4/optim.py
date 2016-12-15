@@ -18,7 +18,8 @@ def sgd(fsum, x0, n_iters=1000, step_size=0.1, trace=False):
         i_cur = random.randint(0, n_funcs-1)
         x_cur = x_cur - step_size * fsum.call_ith(i_cur, x_cur)[1]
         x_out = x_out + x_cur
-        logger.record_point(1/(k + 1) * x_out)
+        if trace:
+            logger.record_point(1/(k + 1) * x_out)
 
     x_out /= n_iters
 
@@ -69,4 +70,4 @@ def svrg(fsum, x0, n_stages=10, n_inner_iters=None, tol=1e-4, trace=False, L0=1)
         hist = logger.get_hist()
         return x_s, hist
     else :
-        x_s
+        return x_s

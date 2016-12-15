@@ -3,6 +3,7 @@ from sklearn.datasets import load_svmlight_file
 from logistic import LossFuncSum
 from optim import sgd, svrg
 from logistic import predict_labels
+import matplotlib.pyplot as plt
 
 def calc_error(x):
     b_hat = predict_labels(A_test, x)
@@ -23,3 +24,12 @@ A_test, b_test = load_svmlight_file('E:\Programms\Py\MOMO\Data\w5a.t', n_feature
 print('Initial error: %g' % calc_error(x0))
 print('SGD result: %g' % calc_error(x_sgd))
 print('SVRG result: %g' % calc_error(x_svrg))
+
+plt.figure()
+plt.plot(hist_sgd['epoch'], hist_sgd['f'], linewidth=4, label='SGD')
+plt.plot(hist_svrg['epoch'], hist_svrg['f'], linewidth=4, label='SVRG')
+plt.xlabel('Epoch')
+plt.ylabel('Function value')
+plt.grid()
+plt.legend()
+plt.show()
