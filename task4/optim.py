@@ -43,28 +43,48 @@ def svrg(fsum, x0, n_stages=10, n_inner_iters=None, tol=1e-4, trace=False, L0=1)
         logger = Logger(fsum)
 
     for s in range(n_stages) :
+
         g_s = fsum.call_ith(0,x_s)[1]
+
         for i in range(1, n_funcs):
             g_s = g_s + fsum.call_ith(i,x_s)[1]
+
         g_s = (1/n_funcs) * g_s
         x_k = x_s
         x_out_in = np.zeros_like(x_k)
+
         for k_in in range(n_iter_inners):
+
             i_cur = random.randint(0, n_funcs-1)
             g_k_in = fsum.call_ith(i_cur, x_k)[1] - fsum.call_ith(i_cur, x_s)[1] + g_s
+
             while True :
+
                 x = x_k - (0.1/L)*g_k_in
                 f_i_cur = fsum.call_ith(i_cur, x_k)
                 nesterov_subject = fsum.call_ith(i_cur, x)[0] > f_i_cur[0] + f_i_cur[1].dot(x - x_k) + (L/2)*norm(x - x_k)**2
+
                 if nesterov_subject :
                     L *= 2
+
                 if not nesterov_subject :
                     break
             x_k = x
             x_out_in = x_out_in + x_k
             L = max(L0, L / (2**(1/n_iter_inners)))
             logger.record_point((1 / (k_in + 1)) * x_out_in)
+
         x_s = (1 / (n_iter_inners))*x_out_in
+
+        g = 0
+        for i in range(n_funcs):
+            gi = fsum.call_ith(i, x_s)[1]
+            g = g + gi
+        g /= n_funcs
+        norm_g = norm(g, np.inf)
+
+        if norm_g <= tol :
+            break
 
     if trace:
         hist = logger.get_hist()
